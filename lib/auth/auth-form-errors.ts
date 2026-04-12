@@ -48,6 +48,9 @@ export function mapSignUpApiError(message: string, code?: string): string {
 export function mapThrownAuthError(e: unknown): string {
   if (e instanceof Error) {
     const msg = e.message
+    if (msg.includes('Invalid supabaseUrl') || msg.includes('supabaseUrl is required')) {
+      return 'Неверный NEXT_PUBLIC_SUPABASE_URL. Укажите полный адрес: https://xxxx.supabase.co (обязательно https://).'
+    }
     if (msg.includes('Нет переменных Supabase') || msg.includes('NEXT_PUBLIC_SUPABASE')) {
       return 'Приложение собрано без ключей Supabase. Добавьте NEXT_PUBLIC_SUPABASE_URL и ключ (anon или publishable) в Vercel → Environment → Production и сделайте Redeploy.'
     }
