@@ -12,6 +12,26 @@ function clientHasSupabaseEnv(): boolean {
   )
 }
 
+/** Только путь на том же сайте (без open redirect через //) */
+function safeNextPath(next: string): string {
+  if (!next.startsWith('/') || next.startsWith('//')) return '/'
+  return next
+}
+
+function formatAuthError(err: unknown): string {
+  if (err && typeof err === 'object' && 'message' in err) {
+    const m = String((err as { message: string }).message)
+    if (/email not confirmed|not confirmed/i.test(m)) {
+      return 'Сначала подтвердите email по ссылке из письма. Либо отключите «Confirm email» в Supabase → Authentication → Providers → Email.'
+    }
+    if (/invalid login|invalid credentials|invalid email or password/i.test(m)) {
+      return 'Неверный email или пароль.'
+    }
+    return m
+  }
+  return 'Ошибка входа'
+}
+
 export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -93,7 +113,7 @@ export default function LoginForm() {
           return
         }
       } else {
-        const { error: err } = await withTimeout(
+        const { data, error: err } = await withTimeout(
           supabase.auth.signInWithPassword({
             email: email.trim(),
             password,
@@ -102,12 +122,20 @@ export default function LoginForm() {
           'Вход'
         )
         if (err) throw err
+
+        if (!data.session) {
+          setInfo(
+            'Сессия не создана. Обычно так бывает, если email ещё не подтверждён — откройте ссылку из письма и попробуйте снова. Или отключите «Confirm email» в Supabase → Authentication → Providers → Email.'
+          )
+          return
+        }
       }
-      const dest = next.startsWith('/') ? next : '/'
-      router.push(dest)
-      router.refresh()
+
+      /* Полная перезагрузка: cookie сессии гарантированно увидит middleware на сервере */
+      const dest = safeNextPath(next)
+      window.location.assign(dest)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Ошибка входа')
+      setError(formatAuthError(err))
     } finally {
       setLoading(false)
     }
