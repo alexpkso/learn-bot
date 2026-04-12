@@ -1,9 +1,11 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { mapSignUpApiError, mapThrownAuthError } from '@/lib/auth/auth-form-errors'
 import { toAuthEmail } from '@/lib/auth/login-identifier'
+import { isBrowserSupabaseConfigured } from '@/lib/supabase/client-env'
 import { createClient } from '@/lib/supabase/client'
 
 export default function RegisterForm() {
@@ -14,11 +16,21 @@ export default function RegisterForm() {
   const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const envOk = useMemo(() => isBrowserSupabaseConfigured(), [])
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
     setInfo('')
     setLoading(true)
+
+    if (!envOk) {
+      setError(
+        'В этой сборке не заданы переменные Supabase. Укажите их в Vercel и выполните новый деплой.'
+      )
+      setLoading(false)
+      return
+    }
 
     try {
       const supabase = createClient()
@@ -34,12 +46,7 @@ export default function RegisterForm() {
       })
 
       if (err) {
-        const m = err.message.toLowerCase()
-        if (m.includes('already') || m.includes('registered')) {
-          setError('Такой логин уже занят. Войдите или выберите другой.')
-        } else {
-          setError('Не удалось создать аккаунт. Попробуйте другой логин или позже.')
-        }
+        setError(mapSignUpApiError(err.message))
         return
       }
 
@@ -53,13 +60,7 @@ export default function RegisterForm() {
       router.push('/')
       router.refresh()
     } catch (e: unknown) {
-      if (e instanceof Error && e.message.startsWith('Введите')) {
-        setError(e.message)
-      } else if (e instanceof Error && e.message.startsWith('Некорректный')) {
-        setError(e.message)
-      } else {
-        setError('Не удалось зарегистрироваться')
-      }
+      setError(mapThrownAuthError(e))
     } finally {
       setLoading(false)
     }
@@ -71,6 +72,13 @@ export default function RegisterForm() {
       <p className="mt-1 text-center text-[12px] text-text-2">
         Придумайте логин и пароль — только они нужны для входа в приложение.
       </p>
+
+      {!envOk && (
+        <p className="mt-3 rounded-btn border border-amber-200 bg-amber-50 px-3 py-2 text-left text-[11px] leading-snug text-amber-900">
+          Не заданы переменные окружения Supabase в сборке. Проверьте Vercel → Settings → Environment
+          Variables (NEXT_PUBLIC_SUPABASE_URL и ключ).
+        </p>
+      )}
 
       <form onSubmit={(e) => void handleSubmit(e)} className="mt-4 space-y-3">
         <div>
@@ -107,7 +115,7 @@ export default function RegisterForm() {
         {error && <p className="text-[12px] text-red-600">{error}</p>}
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || !envOk}
           className="w-full rounded-btn bg-primary py-2 text-[12px] font-bold text-white hover:bg-blue-700 disabled:opacity-50"
         >
           {loading ? '…' : 'Создать аккаунт'}

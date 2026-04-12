@@ -4,15 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toAuthEmail, toLegacySyntheticEmail } from '@/lib/auth/login-identifier'
+import { isBrowserSupabaseConfigured } from '@/lib/supabase/client-env'
 import { createClient } from '@/lib/supabase/client'
-
-function clientHasSupabaseEnv(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
-      (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY?.trim() ||
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim())
-  )
-}
 
 function safeNextPath(next: string): string {
   if (!next.startsWith('/') || next.startsWith('//')) return '/'
@@ -25,7 +18,7 @@ export default function LoginForm() {
   const next = searchParams.get('next') ?? '/'
   const urlError = searchParams.get('error')
 
-  const envOk = useMemo(() => clientHasSupabaseEnv(), [])
+  const envOk = useMemo(() => isBrowserSupabaseConfigured(), [])
 
   useEffect(() => {
     if (urlError !== 'config' || !envOk) return
