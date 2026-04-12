@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from 'react'
 
-export type VoiceSessionStatus = 'idle' | 'recording' | 'processing'
+export type BrowserSpeechStatus = 'idle' | 'recording' | 'processing'
 
 const LANG_MAP: Record<'sr' | 'en' | 'ru', string> = {
   sr: 'sr-RS',
@@ -11,11 +11,11 @@ const LANG_MAP: Record<'sr' | 'en' | 'ru', string> = {
 }
 
 /**
- * Схема как в docs/claude-voice-quick-order.md: getUserMedia → continuous SpeechRecognition
- * до явной остановки; итог — одна строка в поле чата.
+ * Как в novoprint-accounting (app/page.tsx): Web Speech API, ru-RU-стиль настроек —
+ * interimResults: false, только финальные фразы, continuous до stop.
  */
-export function useVoiceSession(lang: 'sr' | 'en' | 'ru') {
-  const [status, setStatus] = useState<VoiceSessionStatus>('idle')
+export function useBrowserSpeech(lang: 'sr' | 'en' | 'ru') {
+  const [status, setStatus] = useState<BrowserSpeechStatus>('idle')
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const finalTranscriptRef = useRef('')
@@ -30,11 +30,11 @@ export function useVoiceSession(lang: 'sr' | 'en' | 'ru') {
   }, [])
 
   const start = useCallback(
-    async (onFinal: (text: string) => void) => {
+    async (onFinal: (text: string) => void | Promise<void>) => {
       if (typeof window === 'undefined') return
       const SR = window.SpeechRecognition || window.webkitSpeechRecognition
       if (!SR) {
-        window.alert('Распознавание речи недоступно. Используйте Chrome на десктопе.')
+        window.alert('Распознавание речи недоступно. Используйте Chrome / Edge.')
         return
       }
 
@@ -49,7 +49,7 @@ export function useVoiceSession(lang: 'sr' | 'en' | 'ru') {
       finalTranscriptRef.current = ''
       const recognition = new SR()
       recognition.lang = LANG_MAP[lang] ?? 'sr-RS'
-      recognition.interimResults = true
+      recognition.interimResults = false
       recognition.continuous = true
       recognition.maxAlternatives = 1
 
@@ -59,22 +59,28 @@ export function useVoiceSession(lang: 'sr' | 'en' | 'ru') {
         for (let i = e.resultIndex; i < e.results.length; i++) {
           const res = e.results[i]
           if (res.isFinal) {
-            finalTranscriptRef.current += res[0].transcript
+            const piece = res[0]?.transcript ?? ''
+            finalTranscriptRef.current += (finalTranscriptRef.current ? ' ' : '') + piece
           }
         }
       }
 
-      recognition.onerror = () => {
+      recognition.onerror = (ev: Event) => {
+        const err = (ev as SpeechRecognitionErrorEvent).error
+        if (err !== 'aborted' && err !== 'not-allowed' && err !== 'audio-capture') {
+          console.warn('[speech]', err)
+        }
         releaseMic()
         setStatus('idle')
+        recognitionRef.current = null
       }
 
       recognition.onend = () => {
         releaseMic()
         setStatus('processing')
         const text = finalTranscriptRef.current.trim()
-        onFinal(text)
-        setStatus('idle')
+        recognitionRef.current = null
+        void Promise.resolve(onFinal(text)).finally(() => setStatus('idle'))
       }
 
       recognitionRef.current = recognition

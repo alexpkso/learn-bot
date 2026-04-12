@@ -3,7 +3,7 @@
 import { useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useState } from 'react'
 import ChatWindow from '@/components/chat/ChatWindow'
-import { useVoiceSession } from '@/lib/voice/useVoiceSession'
+import { useLessonVoice } from '@/lib/voice/useLessonVoice'
 import type { ChatMessage } from '@/lib/types'
 import { createClient } from '@/lib/supabase/client'
 
@@ -19,8 +19,8 @@ export default function LessonContent() {
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [targetLang, setTargetLang] = useState<'sr' | 'en'>('sr')
 
-  const voiceLang = targetLang === 'en' ? 'en' : 'sr'
-  const { status: voiceStatus, start, stop } = useVoiceSession(voiceLang)
+  const voiceLessonLang = targetLang === 'en' ? 'en' : 'sr'
+  const { status: voiceStatus, start, stop, engine: voiceEngine } = useLessonVoice(voiceLessonLang)
 
   useEffect(() => {
     let cancelled = false
@@ -98,10 +98,16 @@ export default function LessonContent() {
   }, [draft, loading, messages, sessionId, sessionType])
 
   function voiceLabel() {
+    const src =
+      voiceEngine === 'whisper'
+        ? 'Whisper'
+        : voiceEngine === 'browser'
+          ? 'браузер'
+          : '…'
     if (voiceStatus === 'recording') {
-      return 'запись — нажмите микрофон ещё раз, чтобы вставить текст'
+      return `запись (${src}) — нажмите микрофон ещё раз, чтобы вставить текст`
     }
-    if (voiceStatus === 'processing') return 'обработка…'
+    if (voiceStatus === 'processing') return `обработка (${src})…`
     return 'idle'
   }
 

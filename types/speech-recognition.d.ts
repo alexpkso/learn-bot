@@ -13,6 +13,10 @@ interface SpeechRecognition extends EventTarget {
   onend: ((this: SpeechRecognition, ev: Event) => void) | null
 }
 
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string
+}
+
 interface Window {
   SpeechRecognition?: { new (): SpeechRecognition }
   webkitSpeechRecognition?: { new (): SpeechRecognition }
