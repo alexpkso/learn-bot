@@ -3,33 +3,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { toAuthEmail, toLegacySyntheticEmail } from '@/lib/auth/login-identifier'
 import { createClient } from '@/lib/supabase/client'
 
 function clientHasSupabaseEnv(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+      (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY?.trim() ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim())
   )
 }
 
-/** Только путь на том же сайте (без open redirect через //) */
 function safeNextPath(next: string): string {
   if (!next.startsWith('/') || next.startsWith('//')) return '/'
   return next
-}
-
-function formatAuthError(err: unknown): string {
-  if (err && typeof err === 'object' && 'message' in err) {
-    const m = String((err as { message: string }).message)
-    if (/email not confirmed|not confirmed/i.test(m)) {
-      return 'Сначала подтвердите email по ссылке из письма. Либо отключите «Confirm email» в Supabase → Authentication → Providers → Email.'
-    }
-    if (/invalid login|invalid credentials|invalid email or password/i.test(m)) {
-      return 'Неверный email или пароль.'
-    }
-    return m
-  }
-  return 'Ошибка входа'
 }
 
 export default function LoginForm() {
@@ -40,7 +27,6 @@ export default function LoginForm() {
 
   const envOk = useMemo(() => clientHasSupabaseEnv(), [])
 
-  /** Сообщение error=config часто «залипает» в URL после того, как переменные уже в билде — не пугаем зря */
   useEffect(() => {
     if (urlError !== 'config' || !envOk) return
     const u = new URL(window.location.href)
@@ -51,186 +37,107 @@ export default function LoginForm() {
 
   const urlHint =
     urlError === 'config' && !envOk
-      ? 'В сборке нет переменных Supabase. Добавьте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY в Vercel (Production) и сделайте Redeploy.'
+      ? 'Сайт не настроен: не заданы переменные окружения на сервере. Обратитесь к администратору или выполните redeploy после настройки.'
       : urlError === 'profile'
-        ? 'Не удалось прочитать профиль. Выполните SQL-миграцию в Supabase (файл supabase/migrations/…init.sql).'
+        ? 'Не удалось загрузить профиль. Проверьте, что база данных развёрнута по инструкции в репозитории.'
         : urlError === 'auth'
-          ? 'Ошибка входа по ссылке — войдите через email и пароль.'
+          ? 'Вход по ссылке не сработал — используйте логин и пароль.'
           : null
 
-  const [mode, setMode] = useState<'login' | 'register'>('login')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [name, setName] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [info, setInfo] = useState<string | null>(null)
+  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
-  async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () =>
-          reject(
-            new Error(
-              `${label}: нет ответа за ${ms / 1000} с. Проверьте сеть и что Supabase доступен.`
-            )
-          ),
-        ms
-      )
-    })
-    try {
-      return await Promise.race([p, timeoutPromise])
-    } finally {
-      if (timer !== undefined) clearTimeout(timer)
-    }
-  }
-
-  async function submit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError(null)
-    setInfo(null)
+    setError('')
     setLoading(true)
+
     const supabase = createClient()
-    try {
-      if (mode === 'register') {
-        const { data, error: err } = await withTimeout(
-          supabase.auth.signUp({
-            email: email.trim(),
-            password,
-            options: { data: { name: name.trim() || 'Ученик' } },
-          }),
-          25000,
-          'Регистрация'
-        )
-        if (err) throw err
+    const authIdentifier = toAuthEmail(username)
 
-        /* При включённом «Confirm email» сессии нет — редирект на / даёт пустой вход */
-        if (!data.session) {
-          setInfo(
-            'Аккаунт создан. На почту может прийти письмо для подтверждения — откройте ссылку, затем нажмите «Вход». Если письма нет: в Supabase → Authentication → Providers → Email отключите «Confirm email» и зарегистрируйтесь снова или войдите после подтверждения.'
-          )
-          return
-        }
-      } else {
-        const { data, error: err } = await withTimeout(
-          supabase.auth.signInWithPassword({
-            email: email.trim(),
-            password,
-          }),
-          25000,
-          'Вход'
-        )
-        if (err) throw err
+    let authError = (
+      await supabase.auth.signInWithPassword({
+        email: authIdentifier,
+        password,
+      })
+    ).error
 
-        if (!data.session) {
-          setInfo(
-            'Сессия не создана. Обычно так бывает, если email ещё не подтверждён — откройте ссылку из письма и попробуйте снова. Или отключите «Confirm email» в Supabase → Authentication → Providers → Email.'
-          )
-          return
-        }
-      }
-
-      /* Полная перезагрузка: cookie сессии гарантированно увидит middleware на сервере */
-      const dest = safeNextPath(next)
-      window.location.assign(dest)
-    } catch (err: unknown) {
-      setError(formatAuthError(err))
-    } finally {
-      setLoading(false)
+    // Старые учётки могли быть зарегистрированы под другим суффиксом
+    if (authError && !username.includes('@')) {
+      authError = (
+        await supabase.auth.signInWithPassword({
+          email: toLegacySyntheticEmail(username),
+          password,
+        })
+      ).error
     }
+
+    if (authError) {
+      setError('Неверный логин или пароль')
+      setLoading(false)
+      return
+    }
+
+    const dest = safeNextPath(next)
+    router.push(dest)
+    router.refresh()
+    setLoading(false)
   }
 
   return (
     <div className="rounded-card border border-border bg-white p-6 shadow-sm">
       <h1 className="text-center text-lg font-bold text-text-1">Language Lab</h1>
-      <p className="mt-1 text-center text-[12px] text-text-2">
-        Вход по email и паролю. Подтверждение письма в Supabase можно отключить в настройках Auth.
-      </p>
+      <p className="mt-1 text-center text-[12px] text-text-2">Вход в систему</p>
       {urlHint && (
         <p className="mt-3 rounded-btn border border-amber-200 bg-amber-50 px-3 py-2 text-left text-[11px] leading-snug text-amber-900">
           {urlHint}
         </p>
       )}
 
-      <div className="mt-4 flex rounded-btn border border-border bg-bg p-0.5 text-[11px] font-semibold">
-        <button
-          type="button"
-          className={`flex-1 rounded-[6px] py-1.5 ${
-            mode === 'login' ? 'bg-white shadow-sm' : 'text-text-2'
-          }`}
-          onClick={() => setMode('login')}
-        >
-          Вход
-        </button>
-        <button
-          type="button"
-          className={`flex-1 rounded-[6px] py-1.5 ${
-            mode === 'register' ? 'bg-white shadow-sm' : 'text-text-2'
-          }`}
-          onClick={() => setMode('register')}
-        >
-          Регистрация
-        </button>
-      </div>
-
-      <form onSubmit={(e) => void submit(e)} className="mt-4 space-y-3">
-        {mode === 'register' && (
-          <div>
-            <label className="text-[10px] font-bold uppercase tracking-wide text-text-2">
-              Имя
-            </label>
-            <input
-              className="mt-1 w-full rounded-btn border border-border px-3 py-2 text-[13px] outline-none ring-primary focus:ring-1"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              autoComplete="name"
-            />
-          </div>
-        )}
+      <form onSubmit={(e) => void handleSubmit(e)} className="mt-4 space-y-3">
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-wide text-text-2">
-            E-mail
-          </label>
+          <label className="text-[10px] font-bold uppercase tracking-wide text-text-2">Логин</label>
           <input
-            type="email"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
             required
-            className="mt-1 w-full rounded-btn border border-border px-3 py-2 text-[13px] outline-none ring-primary focus:ring-1"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            autoComplete="username"
+            className="mt-1 w-full rounded-btn border border-border px-3 py-2 font-mono text-[13px] outline-none ring-primary focus:ring-1"
           />
         </div>
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-wide text-text-2">
-            Пароль
-          </label>
+          <label className="text-[10px] font-bold uppercase tracking-wide text-text-2">Пароль</label>
           <input
             type="password"
-            required
-            minLength={6}
-            className="mt-1 w-full rounded-btn border border-border px-3 py-2 text-[13px] outline-none ring-primary focus:ring-1"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
+            required
+            autoComplete="current-password"
+            className="mt-1 w-full rounded-btn border border-border px-3 py-2 text-[13px] outline-none ring-primary focus:ring-1"
           />
         </div>
-        {info && (
-          <p className="rounded-btn border border-green-200 bg-green-50 px-3 py-2 text-left text-[11px] leading-snug text-green-900">
-            {info}
-          </p>
-        )}
         {error && <p className="text-[12px] text-red-600">{error}</p>}
         <button
           type="submit"
           disabled={loading}
           className="w-full rounded-btn bg-primary py-2 text-[12px] font-bold text-white hover:bg-blue-700 disabled:opacity-50"
         >
-          {loading ? '…' : mode === 'login' ? 'Войти' : 'Создать аккаунт'}
+          {loading ? 'Вход…' : 'Войти'}
         </button>
       </form>
 
       <p className="mt-4 text-center text-[11px] text-text-2">
+        Нет аккаунта?{' '}
+        <Link href="/register" className="text-primary hover:underline">
+          Регистрация
+        </Link>
+        {' · '}
         <Link href="/" className="text-primary hover:underline">
           На главную
         </Link>

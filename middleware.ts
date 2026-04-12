@@ -23,7 +23,9 @@ export async function middleware(request: NextRequest) {
 
   const env = getSupabasePublicEnvOrNull()
   if (!env) {
-    console.error('[middleware] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
+    console.error(
+      '[middleware] Missing NEXT_PUBLIC_SUPABASE_URL or publishable/anon key (NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY / NEXT_PUBLIC_SUPABASE_ANON_KEY)'
+    )
     if (needsAuth(pathname)) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
@@ -62,7 +64,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url)
     }
 
-    if (user && pathname === '/login') {
+    if (user && (pathname === '/login' || pathname === '/register')) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
       return NextResponse.redirect(url)

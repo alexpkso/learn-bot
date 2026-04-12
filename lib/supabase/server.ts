@@ -9,7 +9,7 @@ export function missingSupabaseConfigResponse() {
   return NextResponse.json(
     {
       error:
-        'Сервер не настроен: задайте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY в Vercel (Production) и выполните Redeploy.',
+        'Сервер не настроен: задайте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY (или ANON_KEY) в Vercel и выполните Redeploy.',
     },
     { status: 500 }
   )
