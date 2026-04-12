@@ -43,26 +43,64 @@ export default function LoginForm() {
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () =>
+          reject(
+            new Error(
+              `${label}: нет ответа за ${ms / 1000} с. Проверьте сеть и что Supabase доступен.`
+            )
+          ),
+        ms
+      )
+    })
+    try {
+      return await Promise.race([p, timeoutPromise])
+    } finally {
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    setInfo(null)
     setLoading(true)
     const supabase = createClient()
     try {
       if (mode === 'register') {
-        const { error: err } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: { data: { name: name.trim() || 'Ученик' } },
-        })
+        const { data, error: err } = await withTimeout(
+          supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: { data: { name: name.trim() || 'Ученик' } },
+          }),
+          25000,
+          'Регистрация'
+        )
         if (err) throw err
+
+        /* При включённом «Confirm email» сессии нет — редирект на / даёт пустой вход */
+        if (!data.session) {
+          setInfo(
+            'Аккаунт создан. На почту может прийти письмо для подтверждения — откройте ссылку, затем нажмите «Вход». Если письма нет: в Supabase → Authentication → Providers → Email отключите «Confirm email» и зарегистрируйтесь снова или войдите после подтверждения.'
+          )
+          return
+        }
       } else {
-        const { error: err } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        })
+        const { error: err } = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          }),
+          25000,
+          'Вход'
+        )
         if (err) throw err
       }
       const dest = next.startsWith('/') ? next : '/'
@@ -149,6 +187,11 @@ export default function LoginForm() {
             autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
           />
         </div>
+        {info && (
+          <p className="rounded-btn border border-green-200 bg-green-50 px-3 py-2 text-left text-[11px] leading-snug text-green-900">
+            {info}
+          </p>
+        )}
         {error && <p className="text-[12px] text-red-600">{error}</p>}
         <button
           type="submit"
