@@ -2,6 +2,8 @@ import { redirect } from 'next/navigation'
 import Sidebar from '@/components/app/Sidebar'
 import { createServerClientSupabase } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AppLayout({
   children,
 }: {
@@ -10,16 +12,27 @@ export default async function AppLayout({
   const supabase = createServerClientSupabase()
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
+  if (userError || !user) {
+    redirect('/login')
+  }
+
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('onboarding_done')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (!profile?.onboarding_done) redirect('/')
+  if (profileError) {
+    console.error('[app layout] profiles:', profileError.message)
+    redirect('/login?error=profile')
+  }
+
+  if (!profile?.onboarding_done) {
+    redirect('/')
+  }
 
   return (
     <div className="flex h-screen overflow-hidden bg-bg">

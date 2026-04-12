@@ -1,6 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createServerClientSupabase } from '@/lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+
 export default async function OnboardingLayout({
   children,
 }: {
@@ -9,16 +11,27 @@ export default async function OnboardingLayout({
   const supabase = createServerClientSupabase()
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser()
-  if (!user) redirect('/login')
 
-  const { data: profile } = await supabase
+  if (userError || !user) {
+    redirect('/login')
+  }
+
+  const { data: profile, error: profileError } = await supabase
     .from('profiles')
     .select('onboarding_done')
     .eq('id', user.id)
-    .single()
+    .maybeSingle()
 
-  if (profile?.onboarding_done) redirect('/dashboard')
+  if (profileError) {
+    console.error('[onboarding layout] profiles:', profileError.message)
+    redirect('/login?error=profile')
+  }
+
+  if (profile?.onboarding_done) {
+    redirect('/dashboard')
+  }
 
   return (
     <div className="min-h-screen bg-bg px-4 py-10">
