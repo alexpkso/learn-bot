@@ -72,3 +72,11 @@ npm run dev
 - [ ] Email без подтверждения (если нужен мгновенный вход).
 - [ ] Переменные окружения на Vercel совпадают с локальными.
 - [ ] В Supabase указаны URL сайта и redirect для продакшена.
+
+### Ошибка: «No Output Directory named public»
+
+Сборка Next.js проходит, а деплой падает — в настройках проекта на Vercel выбран не тот тип (часто **Other** / статика) или задан **Output Directory** = `public`.
+
+В корне репозитория добавлен `vercel.json` с `"framework": "nextjs"` — закоммитьте и запушьте. Дополнительно в Vercel: **Settings → Build & Deployment** — **Framework Preset: Next.js**, для **Output Directory** выключите override (пусто).
+
+Если остались старые overrides: в том же разделе используйте **Reset** / сброс к настройкам проекта для Production.
