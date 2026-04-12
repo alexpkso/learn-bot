@@ -1,18 +1,37 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+
+function clientHasSupabaseEnv(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() &&
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
+  )
+}
 
 export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/'
   const urlError = searchParams.get('error')
+
+  const envOk = useMemo(() => clientHasSupabaseEnv(), [])
+
+  /** Сообщение error=config часто «залипает» в URL после того, как переменные уже в билде — не пугаем зря */
+  useEffect(() => {
+    if (urlError !== 'config' || !envOk) return
+    const u = new URL(window.location.href)
+    u.searchParams.delete('error')
+    const clean = u.pathname + (u.search ? u.search : '')
+    router.replace(clean, { scroll: false })
+  }, [urlError, envOk, router])
+
   const urlHint =
-    urlError === 'config'
-      ? 'На сервере не заданы переменные Supabase (NEXT_PUBLIC_*) для Production или не сделан Redeploy после их добавления.'
+    urlError === 'config' && !envOk
+      ? 'В сборке нет переменных Supabase. Добавьте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY в Vercel (Production) и сделайте Redeploy.'
       : urlError === 'profile'
         ? 'Не удалось прочитать профиль. Выполните SQL-миграцию в Supabase (файл supabase/migrations/…init.sql).'
         : urlError === 'auth'
@@ -46,7 +65,8 @@ export default function LoginForm() {
         })
         if (err) throw err
       }
-      router.push(next)
+      const dest = next.startsWith('/') ? next : '/'
+      router.push(dest)
       router.refresh()
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Ошибка входа')
@@ -59,7 +79,7 @@ export default function LoginForm() {
     <div className="rounded-card border border-border bg-white p-6 shadow-sm">
       <h1 className="text-center text-lg font-bold text-text-1">Language Lab</h1>
       <p className="mt-1 text-center text-[12px] text-text-2">
-        Вход без подтверждения e-mail (включите это в Supabase — см. docs/DEPLOY.md)
+        Вход по email и паролю. Подтверждение письма в Supabase можно отключить в настройках Auth.
       </p>
       {urlHint && (
         <p className="mt-3 rounded-btn border border-amber-200 bg-amber-50 px-3 py-2 text-left text-[11px] leading-snug text-amber-900">
