@@ -2,6 +2,8 @@
 
 Краткая инструкция под проект **Language Lab** в `F:\learn-bot`.
 
+**Подробно про Supabase** (SQL, Auth, URL, переменные): [SUPABASE.md](./SUPABASE.md).
+
 ## 1. Репозиторий на GitHub
 
 1. Зайдите на [https://github.com/new](https://github.com/new).
