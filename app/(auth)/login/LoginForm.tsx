@@ -3,7 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { toAuthEmail, toLegacySyntheticEmail } from '@/lib/auth/login-identifier'
+import {
+  toAuthEmail,
+  toLegacyInternalSyntheticEmail,
+  toLegacySyntheticEmail,
+} from '@/lib/auth/login-identifier'
 import { isBrowserSupabaseConfigured } from '@/lib/supabase/client-env'
 import { createClient } from '@/lib/supabase/client'
 
@@ -57,11 +61,19 @@ export default function LoginForm() {
       })
     ).error
 
-    // Старые учётки могли быть зарегистрированы под другим суффиксом
+    // Старые учётки — другие суффиксы синтетического адреса
     if (authError && !username.includes('@')) {
       authError = (
         await supabase.auth.signInWithPassword({
           email: toLegacySyntheticEmail(username),
+          password,
+        })
+      ).error
+    }
+    if (authError && !username.includes('@')) {
+      authError = (
+        await supabase.auth.signInWithPassword({
+          email: toLegacyInternalSyntheticEmail(username),
           password,
         })
       ).error

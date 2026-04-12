@@ -1,7 +1,19 @@
 /** Понятные сообщения для форм входа/регистрации (Supabase Auth). */
 
-export function mapSignUpApiError(message: string): string {
+export function mapSignUpApiError(message: string, code?: string): string {
   const m = message.toLowerCase()
+
+  if (
+    code === 'unexpected_failure' ||
+    m.includes('database error') ||
+    m.includes('saving new user') ||
+    m.includes('error saving user')
+  ) {
+    return (
+      'Ошибка базы при регистрации (часто триггер профиля). Откройте Supabase → SQL Editor, ' +
+      'выполните миграцию 20260412190000_fix_signup_profile_trigger.sql из репозитория, затем повторите регистрацию.'
+    )
+  }
 
   if (
     m.includes('already') ||

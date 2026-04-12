@@ -46,7 +46,8 @@ export default function RegisterForm() {
       })
 
       if (err) {
-        setError(mapSignUpApiError(err.message))
+        const code = typeof err === 'object' && err && 'code' in err ? String((err as { code?: string }).code) : undefined
+        setError(mapSignUpApiError(err.message, code))
         return
       }
 
