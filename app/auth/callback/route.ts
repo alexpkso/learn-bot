@@ -1,19 +1,17 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { getSupabasePublicEnv } from '@/lib/supabase/env'
+import { getSupabasePublicEnvOrNull } from '@/lib/supabase/env'
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/dashboard'
 
-  let url: string
-  let key: string
-  try {
-    ;({ url, key } = getSupabasePublicEnv())
-  } catch {
+  const env = getSupabasePublicEnvOrNull()
+  if (!env) {
     return NextResponse.redirect(`${origin}/login?error=config`)
   }
+  const { url, key } = env
 
   if (code) {
     const response = NextResponse.redirect(`${origin}${next}`)

@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
-import { getSupabasePublicEnv } from '@/lib/supabase/env'
+import { getSupabasePublicEnvOrNull } from '@/lib/supabase/env'
 
 const AUTH_REQUIRED_PREFIXES = [
   '/dashboard',
@@ -21,17 +21,15 @@ function needsAuth(pathname: string) {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  let supabaseUrl: string
-  let supabaseAnonKey: string
-  try {
-    ;({ url: supabaseUrl, key: supabaseAnonKey } = getSupabasePublicEnv())
-  } catch (e) {
-    console.error('[middleware]', e)
+  const env = getSupabasePublicEnvOrNull()
+  if (!env) {
+    console.error('[middleware] Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY')
     if (needsAuth(pathname)) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
     return NextResponse.next({ request })
   }
+  const { url: supabaseUrl, key: supabaseAnonKey } = env
 
   try {
     let supabaseResponse = NextResponse.next({ request })

@@ -1,8 +1,12 @@
 import { NextResponse } from 'next/server'
-import { createServerClientSupabase } from '@/lib/supabase/server'
+import {
+  createServerClientSupabase,
+  missingSupabaseConfigResponse,
+} from '@/lib/supabase/server'
 
 export async function GET() {
   const supabase = createServerClientSupabase()
+  if (!supabase) return missingSupabaseConfigResponse()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -20,6 +24,7 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   const supabase = createServerClientSupabase()
+  if (!supabase) return missingSupabaseConfigResponse()
   const {
     data: { user },
   } = await supabase.auth.getUser()

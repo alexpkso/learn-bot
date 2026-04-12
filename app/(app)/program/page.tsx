@@ -1,8 +1,13 @@
+import { redirect } from 'next/navigation'
 import { createServerClientSupabase } from '@/lib/supabase/server'
 import type { ProgramModule } from '@/lib/types'
 
 export default async function ProgramPage() {
   const supabase = createServerClientSupabase()
+  if (!supabase) {
+    redirect('/login?error=config')
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser()

@@ -1,9 +1,30 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { getSupabasePublicEnv } from '@/lib/supabase/env'
+import { NextResponse } from 'next/server'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { getSupabasePublicEnvOrNull } from '@/lib/supabase/env'
 
-export function createServerClientSupabase() {
-  const { url, key } = getSupabasePublicEnv()
+/** Ответ 500 для Route Handlers, если не заданы переменные Supabase */
+export function missingSupabaseConfigResponse() {
+  return NextResponse.json(
+    {
+      error:
+        'Сервер не настроен: задайте NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY в Vercel (Production) и выполните Redeploy.',
+    },
+    { status: 500 }
+  )
+}
+
+/**
+ * Клиент для Server Components и Route Handlers.
+ * Если переменные окружения не заданы — возвращает `null` (не бросает исключение).
+ * В Route Handlers нельзя полагаться на throw: иначе 500 и error boundary.
+ */
+export function createServerClientSupabase(): SupabaseClient | null {
+  const env = getSupabasePublicEnvOrNull()
+  if (!env) return null
+
+  const { url, key } = env
   const cookieStore = cookies()
 
   return createServerClient(url, key, {

@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
-import { createServerClientSupabase } from '@/lib/supabase/server'
+import {
+  createServerClientSupabase,
+  missingSupabaseConfigResponse,
+} from '@/lib/supabase/server'
 import { getNextReviewDate, getNextStatus } from '@/lib/words/spaced-repetition'
 
 export async function GET() {
   const supabase = createServerClientSupabase()
+  if (!supabase) return missingSupabaseConfigResponse()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -21,6 +25,7 @@ export async function GET() {
 
 export async function POST(req: Request) {
   const supabase = createServerClientSupabase()
+  if (!supabase) return missingSupabaseConfigResponse()
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -50,6 +55,7 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   const supabase = createServerClientSupabase()
+  if (!supabase) return missingSupabaseConfigResponse()
   const {
     data: { user },
   } = await supabase.auth.getUser()

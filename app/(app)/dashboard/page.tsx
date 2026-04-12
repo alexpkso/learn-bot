@@ -1,10 +1,15 @@
 import PecatBadge from '@/components/dashboard/PecatBadge'
 import WordsDue from '@/components/dashboard/WordsDue'
 import XPBar from '@/components/dashboard/XPBar'
+import { redirect } from 'next/navigation'
 import { createServerClientSupabase } from '@/lib/supabase/server'
 
 export default async function DashboardPage() {
   const supabase = createServerClientSupabase()
+  if (!supabase) {
+    redirect('/login?error=config')
+  }
+
   const {
     data: { user },
   } = await supabase.auth.getUser()

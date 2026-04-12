@@ -9,6 +9,15 @@ export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/'
+  const urlError = searchParams.get('error')
+  const urlHint =
+    urlError === 'config'
+      ? 'На сервере не заданы переменные Supabase (NEXT_PUBLIC_*) для Production или не сделан Redeploy после их добавления.'
+      : urlError === 'profile'
+        ? 'Не удалось прочитать профиль. Выполните SQL-миграцию в Supabase (файл supabase/migrations/…init.sql).'
+        : urlError === 'auth'
+          ? 'Ошибка входа по ссылке — войдите через email и пароль.'
+          : null
 
   const [mode, setMode] = useState<'login' | 'register'>('login')
   const [email, setEmail] = useState('')
@@ -52,6 +61,11 @@ export default function LoginForm() {
       <p className="mt-1 text-center text-[12px] text-text-2">
         Вход без подтверждения e-mail (включите это в Supabase — см. docs/DEPLOY.md)
       </p>
+      {urlHint && (
+        <p className="mt-3 rounded-btn border border-amber-200 bg-amber-50 px-3 py-2 text-left text-[11px] leading-snug text-amber-900">
+          {urlHint}
+        </p>
+      )}
 
       <div className="mt-4 flex rounded-btn border border-border bg-bg p-0.5 text-[11px] font-semibold">
         <button

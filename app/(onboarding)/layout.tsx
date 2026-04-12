@@ -9,6 +9,10 @@ export default async function OnboardingLayout({
   children: React.ReactNode
 }) {
   const supabase = createServerClientSupabase()
+  if (!supabase) {
+    redirect('/login?error=config')
+  }
+
   const {
     data: { user },
     error: userError,

@@ -11,7 +11,10 @@ import { buildSystemPrompt } from '@/lib/claude/system-prompt'
 import { claudeTools } from '@/lib/claude/tools'
 import { buildLearnerNotes } from '@/lib/onboarding/buildLearnerNotes'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { createServerClientSupabase } from '@/lib/supabase/server'
+import {
+  createServerClientSupabase,
+  missingSupabaseConfigResponse,
+} from '@/lib/supabase/server'
 import { getNextReviewDate, getNextStatus } from '@/lib/words/spaced-repetition'
 import type { OnboardingPayload, WordStatus } from '@/lib/types'
 
@@ -111,6 +114,8 @@ export async function POST(req: Request) {
   }
 
   const supabase = createServerClientSupabase()
+  if (!supabase) return missingSupabaseConfigResponse()
+
   const {
     data: { user },
   } = await supabase.auth.getUser()

@@ -1,6 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { NextResponse } from 'next/server'
-import { createServerClientSupabase } from '@/lib/supabase/server'
+import {
+  createServerClientSupabase,
+  missingSupabaseConfigResponse,
+} from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -24,6 +27,8 @@ export async function POST(req: Request) {
   }
 
   const supabase = createServerClientSupabase()
+  if (!supabase) return missingSupabaseConfigResponse()
+
   const {
     data: { user },
   } = await supabase.auth.getUser()
