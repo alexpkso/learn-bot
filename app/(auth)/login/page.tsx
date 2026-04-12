@@ -1,7 +1,9 @@
 import { Suspense } from 'react'
+import { getSupabasePublicEnvOrNull } from '@/lib/supabase/env'
 import LoginForm from './LoginForm'
 
 export default function LoginPage() {
+  const publicEnv = getSupabasePublicEnvOrNull()
   return (
     <Suspense
       fallback={
@@ -10,7 +12,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginForm />
+      <LoginForm publicEnv={publicEnv} />
     </Suspense>
   )
 }

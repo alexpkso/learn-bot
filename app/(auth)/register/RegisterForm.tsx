@@ -7,8 +7,9 @@ import { mapSignUpApiError, mapThrownAuthError } from '@/lib/auth/auth-form-erro
 import { toAuthEmail } from '@/lib/auth/login-identifier'
 import { isBrowserSupabaseConfigured } from '@/lib/supabase/client-env'
 import { createClient } from '@/lib/supabase/client'
+import type { SupabasePublicEnv } from '@/lib/supabase/env'
 
-export default function RegisterForm() {
+export default function RegisterForm({ publicEnv }: { publicEnv: SupabasePublicEnv | null }) {
   const router = useRouter()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -16,7 +17,10 @@ export default function RegisterForm() {
   const [info, setInfo] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const envOk = useMemo(() => isBrowserSupabaseConfigured(), [])
+  const envOk = useMemo(
+    () => publicEnv !== null || isBrowserSupabaseConfigured(),
+    [publicEnv]
+  )
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -33,7 +37,7 @@ export default function RegisterForm() {
     }
 
     try {
-      const supabase = createClient()
+      const supabase = createClient(publicEnv ?? undefined)
       const authIdentifier = toAuthEmail(username)
       const loginPart = username.trim().toLowerCase().split('@')[0] || 'Ученик'
 
@@ -76,8 +80,9 @@ export default function RegisterForm() {
 
       {!envOk && (
         <p className="mt-3 rounded-btn border border-amber-200 bg-amber-50 px-3 py-2 text-left text-[11px] leading-snug text-amber-900">
-          Не заданы переменные окружения Supabase в сборке. Проверьте Vercel → Settings → Environment
-          Variables (NEXT_PUBLIC_SUPABASE_URL и ключ).
+          Не заданы переменные Supabase для этого окружения. В Vercel → Settings → Environment Variables
+          добавьте для Production: NEXT_PUBLIC_SUPABASE_URL и NEXT_PUBLIC_SUPABASE_ANON_KEY (или пары
+          SUPABASE_URL + SUPABASE_ANON_KEY). После сохранения — Redeploy.
         </p>
       )}
 

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { SupabaseEnvInjector } from '@/components/supabase/SupabaseEnvInjector'
+import { getSupabasePublicEnvOrNull } from '@/lib/supabase/env'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -11,9 +13,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const publicEnv = getSupabasePublicEnvOrNull()
   return (
     <html lang="ru">
-      <body>{children}</body>
+      <body>
+        <SupabaseEnvInjector env={publicEnv}>{children}</SupabaseEnvInjector>
+      </body>
     </html>
   )
 }

@@ -10,19 +10,23 @@ import {
 } from '@/lib/auth/login-identifier'
 import { isBrowserSupabaseConfigured } from '@/lib/supabase/client-env'
 import { createClient } from '@/lib/supabase/client'
+import type { SupabasePublicEnv } from '@/lib/supabase/env'
 
 function safeNextPath(next: string): string {
   if (!next.startsWith('/') || next.startsWith('//')) return '/'
   return next
 }
 
-export default function LoginForm() {
+export default function LoginForm({ publicEnv }: { publicEnv: SupabasePublicEnv | null }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const next = searchParams.get('next') ?? '/'
   const urlError = searchParams.get('error')
 
-  const envOk = useMemo(() => isBrowserSupabaseConfigured(), [])
+  const envOk = useMemo(
+    () => publicEnv !== null || isBrowserSupabaseConfigured(),
+    [publicEnv]
+  )
 
   useEffect(() => {
     if (urlError !== 'config' || !envOk) return
@@ -51,7 +55,7 @@ export default function LoginForm() {
     setError('')
     setLoading(true)
 
-    const supabase = createClient()
+    const supabase = createClient(publicEnv ?? undefined)
     const authIdentifier = toAuthEmail(username)
 
     let authError = (

@@ -1,5 +1,7 @@
+import { getSupabasePublicEnvOrNull } from '@/lib/supabase/env'
 import RegisterForm from './RegisterForm'
 
 export default function RegisterPage() {
-  return <RegisterForm />
+  const publicEnv = getSupabasePublicEnvOrNull()
+  return <RegisterForm publicEnv={publicEnv} />
 }

@@ -1,12 +1,6 @@
-import {
-  getSupabasePublishableKeyOrNull,
-  normalizePublicSupabaseUrl,
-} from '@/lib/supabase/env'
+import { getSupabasePublicEnvOrNull } from '@/lib/supabase/env'
 
-/** Для клиентских форм: в сборке должны быть зашиты NEXT_PUBLIC_* (иначе createClient бросает). */
+/** Только то, что видно в клиентском бандле (NEXT_PUBLIC_*). Для полной проверки см. формы с serverPublicEnv. */
 export function isBrowserSupabaseConfigured(): boolean {
-  return Boolean(
-    normalizePublicSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL) &&
-      getSupabasePublishableKeyOrNull()
-  )
+  return getSupabasePublicEnvOrNull() !== null
 }

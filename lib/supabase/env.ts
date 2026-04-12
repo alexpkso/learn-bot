@@ -1,7 +1,36 @@
-/** Публичные переменные Supabase (доступны в браузере и на сервере). */
+/** Публичные переменные Supabase (браузер + сервер). */
+
+function stripEnvQuotes(s: string | undefined): string | undefined {
+  if (s == null) return undefined
+  let t = s.trim().replace(/^\uFEFF/, '')
+  if (!t) return undefined
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    t = t.slice(1, -1).trim()
+  }
+  return t || undefined
+}
 
 /**
- * Приводит NEXT_PUBLIC_SUPABASE_URL к виду, который принимает @supabase/supabase-js.
+ * URL проекта: сначала NEXT_PUBLIC (попадает в клиентский бандл), иначе SUPABASE_URL
+ * (только на сервере — тогда передаём в формы через props).
+ */
+export function getRawSupabaseUrl(): string | undefined {
+  return stripEnvQuotes(process.env.NEXT_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL)
+}
+
+/**
+ * Anon / publishable ключ: NEXT_PUBLIC_* или SUPABASE_ANON_KEY (на сервере).
+ */
+export function getRawSupabaseAnonKey(): string | undefined {
+  return stripEnvQuotes(
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY ??
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+      process.env.SUPABASE_ANON_KEY
+  )
+}
+
+/**
+ * Приводит URL к виду, который принимает @supabase/supabase-js.
  * Частые ошибки: только host без схемы, лишние кавычки из Vercel/.env, BOM.
  */
 export function normalizePublicSupabaseUrl(raw: string | undefined | null): string | null {
@@ -13,7 +42,6 @@ export function normalizePublicSupabaseUrl(raw: string | undefined | null): stri
   if (!u) return null
 
   if (!/^https?:\/\//i.test(u)) {
-    // только host, без https:// (частая ошибка в Vercel)
     if (/^[a-z0-9][a-z0-9.-]*\.supabase\.co$/i.test(u) || /^[a-z0-9][a-z0-9.-]*\.supabase\.com$/i.test(u)) {
       u = `https://${u}`
     } else {
@@ -30,21 +58,18 @@ export function normalizePublicSupabaseUrl(raw: string | undefined | null): stri
   }
 }
 
-/** Как в novoprint-accounting: publishable key; иначе классический anon key. */
-export function getSupabasePublishableKeyOrNull(): string | null {
-  let key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY?.trim() ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim()
-  if (!key) return null
-  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) {
-    key = key.slice(1, -1).trim()
-  }
-  return key || null
+export type SupabasePublicEnv = { url: string; key: string }
+
+/** Единая точка: URL + ключ для createBrowserClient / middleware / API. */
+export function getSupabasePublicEnvOrNull(): SupabasePublicEnv | null {
+  const rawUrl = getRawSupabaseUrl()
+  const rawKey = getRawSupabaseAnonKey()
+  if (!rawUrl || !rawKey) return null
+  const url = normalizePublicSupabaseUrl(rawUrl)
+  if (!url) return null
+  return { url, key: rawKey }
 }
 
-export function getSupabasePublicEnvOrNull(): { url: string; key: string } | null {
-  const url = normalizePublicSupabaseUrl(process.env.NEXT_PUBLIC_SUPABASE_URL)
-  const key = getSupabasePublishableKeyOrNull()
-  if (!url || !key) return null
-  return { url, key }
+export function getSupabasePublishableKeyOrNull(): string | null {
+  return getRawSupabaseAnonKey() ?? null
 }
